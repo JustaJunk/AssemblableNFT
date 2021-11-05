@@ -8,7 +8,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     // the following will only deploy "GenericMetaTxProcessor" if the contract was never deployed or if the code changed since last deployment
     await deploy("AssemblableNFT", {
         from: deployer,
-        args: ["AssemblyCat", "AsC", "ipfs://cid/", 10000, 10000],
+        args: ["AssemblyCat", "AsC", "ipfs://DirectoryOfAllAssembly/", "ipfs://DirectoryOfAllComponents/", 10000],
         // gasPrice: 100000000000,
     });
 };
