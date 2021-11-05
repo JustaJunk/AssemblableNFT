@@ -15,7 +15,7 @@ async function main() {
 
   // We get the contract to deploy
   const assemblableNFTFactory = await ethers.getContractFactory("AssemblableNFT");
-  const assemblableNFT = await assemblableNFTFactory.deploy("AssemblyCat", "AsC", " ipfs://cid/", 10000, 10000);
+  const assemblableNFT = await assemblableNFTFactory.deploy("AssemblyCat", "AsC", "ipfs://cid/", 10000, 10000);
 
   await assemblableNFT.deployed();
 
