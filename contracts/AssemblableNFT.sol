@@ -3,17 +3,27 @@ pragma solidity ^0.8.0;
 
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/finance/PaymentSplitter.sol";
 import "./ComponentNFT.sol";
 
-interface ComponentInterface {
-    function disassemble(address owner, bytes4 componentCode) external;
+struct AssemblableNFTSettings {
+    string      name;           // ERC721: name
+    string      symbol;         // ERC721: symbol
+    address[]   payees;         // PaymentSplitter: payees 
+    uint[]      shares;         // PaymentSplitter: shares
+    string      itemsURI;       // ERC1155: URI of all ERC1155 items 
+
+    string      baseURI;        // Prefix of tokenURI
+    uint32      maxSupply;      // Max supply of ERC721 tokens
+    uint        tokenPrice;     // Price of ERC721 tokens
+    bytes4      featureSpace;   // Combination of max feature number of every attribute
 }
 
 /**
  @title An simple example of assemblable NFT
  @author Justa Liang
  */
-contract AssemblableNFT is ERC721Enumerable {
+contract AssemblableNFT is ERC721Enumerable, PaymentSplitter {
 
     /// @dev Token counter
     uint private _counter;
@@ -24,65 +34,82 @@ contract AssemblableNFT is ERC721Enumerable {
     /// @dev Component contract
     ComponentInterface public componentContract;
 
-    /// @dev Base URI
-    string public baseURI;
-
-    /// @dev Max supply of token
-    uint private _maxSupply;
+    /// @dev Settings
+    struct Settings {
+        string      baseURI;        // Base URI of ERC721 tokens
+        uint32      maxSupply;      // Max supply of ERC721 tokens
+        uint        tokenPrice;     // Price of ERC721 tokens
+        bytes4      featureSpace;   // Combination of max feature number of every attribute
+    }
+    Settings public settings;
 
     constructor(
-        string memory name_,
-        string memory symbol_,
-        string memory baseURI_,
-        string memory itemsURI_,
-        uint maxSupply
+        AssemblableNFTSettings memory initSettings
     )
-        ERC721(name_, symbol_)
+        ERC721(initSettings.name, initSettings.symbol)
+        PaymentSplitter(initSettings.payees, initSettings.shares)
     {
         _counter = 1;
-        baseURI = baseURI_;
-        _maxSupply = maxSupply;
-        componentContract = ComponentInterface(address(new ComponentNFT(itemsURI_)));
+        settings.baseURI = initSettings.baseURI;
+        settings.maxSupply = initSettings.maxSupply;
+        settings.tokenPrice = initSettings.tokenPrice;
+        settings.featureSpace = initSettings.featureSpace;
+        componentContract = ComponentInterface(address(new ComponentNFT(initSettings.itemsURI)));
 
         console.log("Deploying a Assemblable NFT");
         console.log("    name:", name());
         console.log("    symbol:", symbol());
-        console.log("    baseURI:", baseURI);
-        console.log("    maxSupply:", _maxSupply);
+        console.log("    baseURI:", settings.baseURI);
+        console.log("    maxSupply:", settings.maxSupply);
+        console.log("    tokenPrice:", settings.tokenPrice);
     }
 
     /// @notice Use assembly number to map token instead of tokenId
     function tokenURI(uint tokenId) public view override returns (string memory) {
-        return string(abi.encodePacked(baseURI, assemblyCodeOf[tokenId]));
+        return string(abi.encodePacked(settings.baseURI, assemblyCodeOf[tokenId]));
     }
 
-    /// @notice Mint token with some assembly number
-    function mint() external {
+    /// @notice Mint token with some random assembly number
+    function mint() external payable {
         require(
-            _counter < _maxSupply,
+            _counter < settings.maxSupply,
             "mint: sold out"
+        );
+        require(
+            Address.isContract(_msgSender()),
+            "mint: from contract"
+        );
+        require(
+            msg.value >= settings.tokenPrice,
+            "mint: not enough fund"
         );
         _safeMint(_msgSender(), _counter);
         // for example blockhash as assembly number
-        assemblyCodeOf[_counter] = bytes4(blockhash(block.number));
+        bytes4 featureSpace = settings.featureSpace;
+        bytes4 assemblyCode = bytes4(blockhash(block.number) ^ bytes32(block.timestamp));
+        bytes4 assemblyCodeAfter = 0x00000000;
+        for (uint8 i = 0; i < 4; i++) {
+            assemblyCodeAfter |= bytes4(bytes1(uint8(assemblyCode[i])%uint8(featureSpace[i]))) << i*8;
+        }
+        assemblyCodeOf[_counter] = assemblyCodeAfter;
         _counter++;
     }
 
-    /// @notice disassemble NFT
+    /// @notice Disassemble an NFT and get component NFTs
     function disassemble(uint tokenId, bytes4 componentCode) external {
         require(
             _isApprovedOrOwner(_msgSender(), tokenId),
             "disassemble: not owner"
         );
         bytes4 assemblyCode = assemblyCodeOf[tokenId];
-        bytes4 assemblyCodeAfter = 0x0;
+        bytes4 assemblyCodeAfter = 0x00000000;
         for (uint8 i = 0; i < 4; i++) {
             console.log(i, ":", uint8(componentCode[i]));
             if (assemblyCode[i] == componentCode[i]) {
                 continue;
             }
-            else if (componentCode[i] == 0x0) {
-                assemblyCodeAfter |= bytes4(assemblyCode[i]) << i*4;
+            else if (componentCode[i] == 0x00) {
+                assemblyCodeAfter |= bytes4(assemblyCode[i]) << i*8;
             }
             else {
                 revert(
@@ -91,27 +118,25 @@ contract AssemblableNFT is ERC721Enumerable {
             }
         }
         assemblyCode = assemblyCodeAfter;
-        componentContract.disassemble(_msgSender(), componentCode);
+        componentContract.mint(_msgSender(), componentCode);
     }
 
-    /// @dev Assemble an NFT (only call by ComponentNFT contract)
-    function assemble(address owner, uint tokenId, bytes4 componentCode) external {
+    /// @dev Assemble an NFT with component NFTs
+    function assemble(uint tokenId, bytes4 componentCode) external {
         require(
-            _isApprovedOrOwner(owner, tokenId),
+            _isApprovedOrOwner(_msgSender(), tokenId),
             "assemble: not owner"
         );
-        require(
-            _msgSender() == address(componentContract),
-            "assemble: not allowed"
-        );
+        componentContract.burn(_msgSender(), componentCode);
         bytes4 assemblyCode = assemblyCodeOf[tokenId];
-        bytes4 assemblyCodeAfter = 0x0;
+        bytes4 assemblyCodeAfter = 0x00000000;
         for (uint8 i = 0; i < 4; i++) {
-            if (componentCode[i] == 0x0) {
-                assemblyCodeAfter |= bytes4(assemblyCode[i]) << i*4;
+            console.log(i, ":", uint8(componentCode[i]));
+            if (componentCode[i] == 0x00) {
+                assemblyCodeAfter |= bytes4(assemblyCode[i]) << i*8;
             }
             else {
-                assemblyCodeAfter |= bytes4(componentCode[i]) << i*4;
+                assemblyCodeAfter |= bytes4(componentCode[i]) << i*8;
             }
         }
         assemblyCodeOf[tokenId] = assemblyCodeAfter;

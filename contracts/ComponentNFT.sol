@@ -4,21 +4,22 @@ pragma solidity ^0.8.0;
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 
-interface AssemblyInterface {
-    function assemble(address owner, uint tokenId, bytes4 componentCode) external;
+interface ComponentInterface {
+    function mint(address owner, bytes4 componentCode) external;
+    function burn(address owner, bytes4 componentCode) external;
 }
 
 /**
  @title An simple example of component NFT
  @author Justa Liang
  */
-contract ComponentNFT is ERC1155 {
+contract ComponentNFT is ERC1155, ComponentInterface {
 
     /// @dev Token counter
     uint private _counter;
 
-    /// @dev Component contract
-    AssemblyInterface public assemblyContract;
+    /// @dev AssemblableNFT contract address
+    address public tokenContract;
 
     constructor(
         string memory uri_
@@ -26,21 +27,55 @@ contract ComponentNFT is ERC1155 {
         ERC1155(uri_)
     {
         _counter = 0;
-        assemblyContract = AssemblyInterface(_msgSender());
+        tokenContract = _msgSender();
         console.log("Deploying a Component NFT");
         console.log("    URI:", uri_);
     }
 
-    /// @dev Dissemble an NFT and mint items for owner (only call by AssemblableNFT contract)
-    function disassemble(address owner, bytes4 componentCode) external {
+    /// @dev Mint items for owner when token got dissembled (only call by AssemblableNFT contract)
+    function mint(address owner, bytes4 componentCode) override external {
         require(
-            _msgSender() == address(assemblyContract),
-            "assemble: not allowed"
+            _msgSender() == tokenContract,
+            "mint: not allowed"
         );
-        for (uint i = 0; i < 4; i++) {
-            if (componentCode[i] != 0x0) {
-                _mint(owner, uint32(bytes4(componentCode[i]) << i*4), 1, "");
+        (uint[] memory ids, uint[] memory amounts) = _convertToItems(componentCode);
+        _mintBatch(owner, ids, amounts, "");
+    }
+
+    /// @dev Burn items from owner when token got assembled (only call by AssemblableNFT contract)
+    function burn(address owner, bytes4 componentCode) override external {
+        require(
+            _msgSender() == tokenContract,
+            "burn: not allowed"
+        );
+        (uint[] memory ids, uint[] memory amounts) = _convertToItems(componentCode);
+        _burnBatch(owner, ids, amounts);
+    }
+
+    /// @dev Convert component code to item ids
+    function _convertToItems(bytes4 componentCode)
+        private pure returns (uint[] memory itemList, uint[] memory amounts)
+    {
+        bytes4 mask = 0x000000FF;
+        uint8 itemNum = 0;
+        for (uint8 i = 0; i < 4; i++) {
+            if (componentCode & mask != 0) {
+                itemNum++;
             }
+            mask << 8;
+        }
+        itemList = new uint[](itemNum);
+        amounts = new uint[](itemNum);
+        mask = 0x000000FF;
+        uint8 itemIdx = 0;
+        for (uint8 i = 0; i < 4; i++) {
+            bytes4 itemCode = componentCode & mask;
+            if (itemCode != 0) {
+                itemList[itemIdx] = uint32(itemCode);
+                amounts[itemIdx] = 1;
+                itemIdx++;
+            }
+            mask << 8;
         }
     }
 }
