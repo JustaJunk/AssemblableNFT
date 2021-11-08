@@ -50,6 +50,11 @@ const config: HardhatUserConfig = {
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
   },
+  namedAccounts: {
+    deployer: 0,
+    payee1: 1,
+    payee2: 2,
+  },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
     currency: "USD",

@@ -25,6 +25,8 @@ struct AssemblableNFTSettings {
  */
 contract AssemblableNFT is ERC721Enumerable, PaymentSplitter {
 
+    using Strings for uint32;
+
     /// @dev Token counter
     uint private _counter;
 
@@ -49,7 +51,7 @@ contract AssemblableNFT is ERC721Enumerable, PaymentSplitter {
         ERC721(initSettings.name, initSettings.symbol)
         PaymentSplitter(initSettings.payees, initSettings.shares)
     {
-        _counter = 1;
+        _counter = 0;
         settings.baseURI = initSettings.baseURI;
         settings.maxSupply = initSettings.maxSupply;
         settings.tokenPrice = initSettings.tokenPrice;
@@ -64,9 +66,13 @@ contract AssemblableNFT is ERC721Enumerable, PaymentSplitter {
         console.log("    tokenPrice:", settings.tokenPrice);
     }
 
-    /// @notice Use assembly number to map token instead of tokenId
+    /// @notice Use assembly number to map URI instead of tokenId
     function tokenURI(uint tokenId) public view override returns (string memory) {
-        return string(abi.encodePacked(settings.baseURI, assemblyCodeOf[tokenId]));
+        require(
+            _exists(tokenId),
+            "nonexistent token"
+        );
+        return string(abi.encodePacked(settings.baseURI, uint32(assemblyCodeOf[tokenId]).toHexString(4)));
     }
 
     /// @notice Mint token with some random assembly number
@@ -76,7 +82,7 @@ contract AssemblableNFT is ERC721Enumerable, PaymentSplitter {
             "mint: sold out"
         );
         require(
-            Address.isContract(_msgSender()),
+            !Address.isContract(_msgSender()),
             "mint: from contract"
         );
         require(
@@ -84,12 +90,13 @@ contract AssemblableNFT is ERC721Enumerable, PaymentSplitter {
             "mint: not enough fund"
         );
         _safeMint(_msgSender(), _counter);
+        
         // for example blockhash as assembly number
         bytes4 featureSpace = settings.featureSpace;
-        bytes4 assemblyCode = bytes4(blockhash(block.number) ^ bytes32(block.timestamp));
+        bytes4 assemblyCode = bytes4(blockhash(block.number) ^ bytes20(_msgSender()));
         bytes4 assemblyCodeAfter = 0x00000000;
         for (uint8 i = 0; i < 4; i++) {
-            assemblyCodeAfter |= bytes4(bytes1(uint8(assemblyCode[i])%uint8(featureSpace[i]))) << i*8;
+            assemblyCodeAfter |= bytes4(bytes1(uint8(assemblyCode[i])%uint8(featureSpace[i]))) >> i*8;
         }
         assemblyCodeOf[_counter] = assemblyCodeAfter;
         _counter++;
@@ -101,15 +108,15 @@ contract AssemblableNFT is ERC721Enumerable, PaymentSplitter {
             _isApprovedOrOwner(_msgSender(), tokenId),
             "disassemble: not owner"
         );
+
         bytes4 assemblyCode = assemblyCodeOf[tokenId];
         bytes4 assemblyCodeAfter = 0x00000000;
         for (uint8 i = 0; i < 4; i++) {
-            console.log(i, ":", uint8(componentCode[i]));
             if (assemblyCode[i] == componentCode[i]) {
                 continue;
             }
             else if (componentCode[i] == 0x00) {
-                assemblyCodeAfter |= bytes4(assemblyCode[i]) << i*8;
+                assemblyCodeAfter |= bytes4(assemblyCode[i]) >> i*8;
             }
             else {
                 revert(
@@ -117,7 +124,8 @@ contract AssemblableNFT is ERC721Enumerable, PaymentSplitter {
                 );
             }
         }
-        assemblyCode = assemblyCodeAfter;
+        assemblyCodeOf[tokenId] = assemblyCodeAfter;
+
         componentContract.mint(_msgSender(), componentCode);
     }
 
@@ -127,18 +135,19 @@ contract AssemblableNFT is ERC721Enumerable, PaymentSplitter {
             _isApprovedOrOwner(_msgSender(), tokenId),
             "assemble: not owner"
         );
-        componentContract.burn(_msgSender(), componentCode);
+
         bytes4 assemblyCode = assemblyCodeOf[tokenId];
         bytes4 assemblyCodeAfter = 0x00000000;
         for (uint8 i = 0; i < 4; i++) {
-            console.log(i, ":", uint8(componentCode[i]));
             if (componentCode[i] == 0x00) {
-                assemblyCodeAfter |= bytes4(assemblyCode[i]) << i*8;
+                assemblyCodeAfter |= bytes4(assemblyCode[i]) >> i*8;
             }
             else {
-                assemblyCodeAfter |= bytes4(componentCode[i]) << i*8;
+                assemblyCodeAfter |= bytes4(componentCode[i]) >> i*8;
             }
         }
         assemblyCodeOf[tokenId] = assemblyCodeAfter;
+
+        componentContract.burn(_msgSender(), componentCode);
     }
 }

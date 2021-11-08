@@ -3,13 +3,13 @@ import { DeployFunction } from 'hardhat-deploy/types';
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const { deploy, read } = hre.deployments;
-    const deployer = (await hre.getUnnamedAccounts())[0];
+    const { deployer, payee1, payee2 } = await hre.getNamedAccounts();
 
     const initSettings = {
         name: "AssemblyCat",
         symbol: "AsC",
-        payees: [deployer],
-        shares: [1],
+        payees: [payee1, payee2],
+        shares: [1, 3],
         itemsURI: "ipfs://DirectoryOfAllComponents/{id}.json",
         baseURI: "ipfs://DirectoryOfAllAssembly/",
         maxSupply: 10000,
@@ -33,3 +33,4 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     }
 };
 export default func;
+func.tags = ['AssemblableNFT'];

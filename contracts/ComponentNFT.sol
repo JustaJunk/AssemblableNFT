@@ -62,7 +62,7 @@ contract ComponentNFT is ERC1155, ComponentInterface {
             if (componentCode & mask != 0) {
                 itemNum++;
             }
-            mask << 8;
+            mask <<= 8;
         }
         itemList = new uint[](itemNum);
         amounts = new uint[](itemNum);
@@ -75,7 +75,7 @@ contract ComponentNFT is ERC1155, ComponentInterface {
                 amounts[itemIdx] = 1;
                 itemIdx++;
             }
-            mask << 8;
+            mask <<= 8;
         }
     }
 }

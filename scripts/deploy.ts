@@ -3,7 +3,7 @@
 //
 // When running the script with `npx hardhat run <script>` you'll find the Hardhat
 // Runtime Environment's members available in the global scope.
-import { ethers } from "hardhat";
+import { ethers, getNamedAccounts } from "hardhat";
 
 async function main() {
   // Hardhat always runs the compile task when running scripts with its command
@@ -13,11 +13,13 @@ async function main() {
   // manually to make sure everything is compiled
   // await hre.run('compile');
 
+  const { payee1, payee2 } = await getNamedAccounts();
+
   const initSettings = {
     name: "AssemblyCat",
     symbol: "AsC",
-    payees: [(await ethers.getSigners())[0].address],
-    shares: [1],
+    payees: [payee1, payee2],
+    shares: [1, 3],
     itemsURI: "ipfs://DirectoryOfAllComponents/{id}.json",
     baseURI: "ipfs://DirectoryOfAllAssembly/",
     maxSupply: 10000,
