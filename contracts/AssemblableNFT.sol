@@ -93,10 +93,11 @@ contract AssemblableNFT is ERC721Enumerable, PaymentSplitter {
         
         // for example blockhash as assembly number
         bytes4 featureSpace = settings.featureSpace;
-        bytes4 assemblyCode = bytes4(blockhash(block.number) ^ bytes20(_msgSender()));
+        bytes4 assemblyCode = bytes4(blockhash(block.number-1) ^ bytes20(_msgSender()));
         bytes4 assemblyCodeAfter = 0x00000000;
         for (uint8 i = 0; i < 4; i++) {
-            assemblyCodeAfter |= bytes4(bytes1(uint8(assemblyCode[i])%uint8(featureSpace[i]))) >> i*8;
+            assemblyCodeAfter >>= 8;
+            assemblyCodeAfter |= bytes1(uint8(assemblyCode[i])%uint8(featureSpace[i]));
         }
         assemblyCodeOf[_counter] = assemblyCodeAfter;
         _counter++;

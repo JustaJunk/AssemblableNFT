@@ -1,10 +1,11 @@
-import { expect } from "chai";
-import { ethers, getNamedAccounts, getUnnamedAccounts, deployments } from "hardhat";
+import { ethers, deployments, network } from "hardhat";
+const { BigNumber } = ethers;
 
 describe("Assemblable NFT", function () {
-  it("Mint", async function () {
+
+  it("Simple flow", async function () {
     // Accounts
-    const [,,,user1, user2] = await ethers.getSigners();
+    const [,,,user0, user1] = await ethers.getSigners();
     
     // Deployment
     await deployments.fixture(["AssemblableNFT"]);
@@ -13,31 +14,42 @@ describe("Assemblable NFT", function () {
     
     // Settings
     const tokenPrice = ethers.utils.parseEther("0.02");
-    
-    // Test
-    console.log("user1 mint token 0");
-    const tx0 = await assemblableNFT.connect(user1).mint({value: tokenPrice});
+  
+    // Test start
+    console.log("\nTest start\n");
+
+    // User0 mint token0
+    console.log("user0 mint token0");
+    const tx0 = await assemblableNFT.connect(user0).mint({value: tokenPrice});
     await tx0.wait();
-    console.log("tokenURI(0):", await assemblableNFT.tokenURI(0), "\n");
-    
-    console.log("user2 mint token 1");
-    const tx1 = await assemblableNFT.connect(user2).mint({value: tokenPrice});
+    console.log(" - tokenURI(0):", await assemblableNFT.tokenURI(0), "\n");
+
+    // User1 mint token1
+    console.log("user1 mint token1");
+    const tx1 = await assemblableNFT.connect(user1).mint({value: tokenPrice});
     await tx1.wait();
-    console.log("tokenURI(1):", await assemblableNFT.tokenURI(1), "\n");
+    console.log(" - tokenURI(1):", await assemblableNFT.tokenURI(1), "\n");
 
-    console.log("user1 disassemble token 0 with code 0x04070000");
-    const tx2 = await assemblableNFT.connect(user1).disassemble(0, "0x04070000");
-    await tx2.wait();
-    console.log("tokenURI(0):", await assemblableNFT.tokenURI(0), "\n");
-
-    console.log("user2 transfer token 1 to user1")
-    const tx3 = await assemblableNFT.connect(user2).transferFrom(user2.address, user1.address, 1);
+    // User1 transfer token1 to User0
+    console.log("user1 transfer token1 to user0")
+    const tx3 = await assemblableNFT.connect(user1).transferFrom(user1.address, user0.address, 1);
     await tx3.wait();
-    console.log("balance(user1):", (await assemblableNFT.balanceOf(user1.address)).toNumber(), "\n");
+    console.log(" - balance(user0):", (await assemblableNFT.balanceOf(user0.address)).toNumber(), "\n");
+
+    // Get assembly code of token0 and chose first two components to form a component code
+    const assemblyCode0 = await assemblableNFT.assemblyCodeOf(0);
+    const componentCode = ethers.utils.hexZeroPad(BigNumber.from(assemblyCode0).and("0xFFFF0000").toHexString(), 4);
+
+    // Disassemble token0 using component code
+    console.log("user0 disassemble token0 with code", componentCode);
+    const tx2 = await assemblableNFT.connect(user0).disassemble(0, componentCode);
+    await tx2.wait();
+    console.log(" - tokenURI(0):", await assemblableNFT.tokenURI(0), "\n");
     
-    console.log("user1 assemble token 1 with code 0x04070000");
-    const tx4 = await assemblableNFT.connect(user1).assemble(1, "0x04070000");
+    // Assemble token1 using components disassembled from token0
+    console.log("user0 assemble token1 with code", componentCode);
+    const tx4 = await assemblableNFT.connect(user0).assemble(1, componentCode);
     await tx4.wait();
-    console.log("tokenURI(1):", await assemblableNFT.tokenURI(1), "\n");
+    console.log(" - tokenURI(1):", await assemblableNFT.tokenURI(1), "\n");
   });
 });

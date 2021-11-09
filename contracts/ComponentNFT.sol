@@ -38,7 +38,7 @@ contract ComponentNFT is ERC1155, ComponentInterface {
             _msgSender() == tokenContract,
             "mint: not allowed"
         );
-        (uint[] memory ids, uint[] memory amounts) = _convertToItems(componentCode);
+        (uint[] memory ids, uint[] memory amounts) = _decodeToItems(componentCode);
         _mintBatch(owner, ids, amounts, "");
     }
 
@@ -48,25 +48,25 @@ contract ComponentNFT is ERC1155, ComponentInterface {
             _msgSender() == tokenContract,
             "burn: not allowed"
         );
-        (uint[] memory ids, uint[] memory amounts) = _convertToItems(componentCode);
+        (uint[] memory ids, uint[] memory amounts) = _decodeToItems(componentCode);
         _burnBatch(owner, ids, amounts);
     }
 
-    /// @dev Convert component code to item ids
-    function _convertToItems(bytes4 componentCode)
+    /// @dev Decode component code to item ids
+    function _decodeToItems(bytes4 componentCode)
         private pure returns (uint[] memory itemList, uint[] memory amounts)
     {
-        bytes4 mask = 0x000000FF;
+        bytes4 mask = 0xFF000000;
         uint8 itemNum = 0;
         for (uint8 i = 0; i < 4; i++) {
             if (componentCode & mask != 0) {
                 itemNum++;
             }
-            mask <<= 8;
+            mask >>= 8;
         }
         itemList = new uint[](itemNum);
         amounts = new uint[](itemNum);
-        mask = 0x000000FF;
+        mask = 0xFF000000;
         uint8 itemIdx = 0;
         for (uint8 i = 0; i < 4; i++) {
             bytes4 itemCode = componentCode & mask;
@@ -75,7 +75,7 @@ contract ComponentNFT is ERC1155, ComponentInterface {
                 amounts[itemIdx] = 1;
                 itemIdx++;
             }
-            mask <<= 8;
+            mask >>= 8;
         }
     }
 }
