@@ -56,26 +56,24 @@ contract ComponentNFT is ERC1155, ComponentInterface {
     function _decodeToItems(bytes4 componentCode)
         private pure returns (uint[] memory itemList, uint[] memory amounts)
     {
-        bytes4 mask = 0xFF000000;
+        uint[] memory preItemList = new uint[](4);
         uint8 itemNum = 0;
+
+        bytes4 mask = 0xFF000000;
         for (uint8 i = 0; i < 4; i++) {
-            if (componentCode & mask != 0) {
+            bytes4 itemCode = componentCode & mask;
+            if (itemCode != 0) {
+                preItemList[itemNum] = uint32(itemCode);
                 itemNum++;
             }
             mask >>= 8;
         }
+
         itemList = new uint[](itemNum);
         amounts = new uint[](itemNum);
-        mask = 0xFF000000;
-        uint8 itemIdx = 0;
-        for (uint8 i = 0; i < 4; i++) {
-            bytes4 itemCode = componentCode & mask;
-            if (itemCode != 0) {
-                itemList[itemIdx] = uint32(itemCode);
-                amounts[itemIdx] = 1;
-                itemIdx++;
-            }
-            mask >>= 8;
+        for (uint8 i = 0; i < itemNum; i++) {
+            itemList[i] = preItemList[i];
+            amounts[i] = 1;
         }
     }
 }

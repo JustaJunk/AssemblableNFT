@@ -1,4 +1,4 @@
-import { ethers, deployments, network } from "hardhat";
+import { ethers, deployments } from "hardhat";
 const { BigNumber } = ethers;
 
 describe("Assemblable NFT", function () {
@@ -38,7 +38,7 @@ describe("Assemblable NFT", function () {
 
     // Get assembly code of token0 and chose first two components to form a component code
     const assemblyCode0 = await assemblableNFT.assemblyCodeOf(0);
-    const componentCode = ethers.utils.hexZeroPad(BigNumber.from(assemblyCode0).and("0xFFFF0000").toHexString(), 4);
+    const componentCode = ethers.utils.hexZeroPad(BigNumber.from(assemblyCode0).and("0x00FF00FF").toHexString(), 4);
 
     // Disassemble token0 using component code
     console.log("user0 disassemble token0 with code", componentCode);

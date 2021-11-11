@@ -112,18 +112,17 @@ contract AssemblableNFT is ERC721Enumerable, PaymentSplitter {
 
         bytes4 assemblyCode = assemblyCodeOf[tokenId];
         bytes4 assemblyCodeAfter = 0x00000000;
+        bytes4 mask = 0xFF000000;
         for (uint8 i = 0; i < 4; i++) {
-            if (assemblyCode[i] == componentCode[i]) {
-                continue;
+            if (componentCode[i] == 0x00) {
+                assemblyCodeAfter |= assemblyCode & mask;
             }
-            else if (componentCode[i] == 0x00) {
-                assemblyCodeAfter |= bytes4(assemblyCode[i]) >> i*8;
-            }
-            else {
+            else if (assemblyCode[i] != componentCode[i]) {
                 revert(
                     "disassemble: not disassemblable"
                 );
             }
+            mask >>= 8;
         }
         assemblyCodeOf[tokenId] = assemblyCodeAfter;
 
@@ -139,13 +138,15 @@ contract AssemblableNFT is ERC721Enumerable, PaymentSplitter {
 
         bytes4 assemblyCode = assemblyCodeOf[tokenId];
         bytes4 assemblyCodeAfter = 0x00000000;
+        bytes4 mask = 0xFF000000;
         for (uint8 i = 0; i < 4; i++) {
             if (componentCode[i] == 0x00) {
-                assemblyCodeAfter |= bytes4(assemblyCode[i]) >> i*8;
+                assemblyCodeAfter |= assemblyCode & mask;
             }
             else {
-                assemblyCodeAfter |= bytes4(componentCode[i]) >> i*8;
+                assemblyCodeAfter |= componentCode & mask;
             }
+            mask >>= 8;
         }
         assemblyCodeOf[tokenId] = assemblyCodeAfter;
 
